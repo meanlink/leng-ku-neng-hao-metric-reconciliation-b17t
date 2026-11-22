@@ -63,8 +63,10 @@ def add_reading(source_id: int, payload: dict, user=Depends(require_roles("analy
 def list_readings(source_id: int, user=Depends(current_user)):
     with db_cursor() as cur:
         cur.execute("""SELECT r.*, c.id AS correction_id, c.status AS correction_status,
+                       t.id AS transfer_id, t.status AS transfer_status,
                        COALESCE(IF(c.status='approved',c.corrected_value,NULL),r.value) AS effective_value,
                        COALESCE(IF(c.status='approved',c.corrected_ton_days,NULL),r.throughput_ton_day) AS effective_ton_days
                        FROM meter_readings r LEFT JOIN reading_corrections c ON c.active_reading_id=r.id
+                       LEFT JOIN reading_transfers t ON t.active_reading_id=r.id
                        WHERE r.source_id=%s ORDER BY r.reading_date DESC""", (source_id,))
         return cur.fetchall()

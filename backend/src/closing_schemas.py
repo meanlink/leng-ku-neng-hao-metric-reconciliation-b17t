@@ -21,6 +21,13 @@ class CorrectionDecision(BaseModel):
     note: Evidence
 
 
+class TransferIn(BaseModel):
+    reading_id: int = Field(gt=0)
+    target_source_id: int = Field(gt=0)
+    target_period: Period
+    evidence: Evidence
+
+
 class SiteBudgetIn(BaseModel):
     site: str = Field(min_length=1, max_length=120)
     budget_kwh: Quantity = Field(gt=0)

@@ -15,6 +15,7 @@
 - 差异定位：按来源映射校验单位/周期，计算实际、预期、差异率，形成复核单。
 - 月报发布：生成草稿，检查复核单关闭与口径兼容后由经理签发。
 - 抄表更正单：保留原始抄表，另一人复核通过后以更正值重算并重新开启受影响的差异单。
+- 抄表归属转移：挂错电表或核算月的抄表记录，复核通过后迁入正确位置，两边差异单重开、月报草稿重算。
 - 站点能耗预算与结算：按月报内的站点配置电量预算和电价，签发时冻结电量、成本及偏差。
 - 供应商账单核验：对照当月站点价表与对账电量，核验供电账单的电量、计费需量及未税小计。退回和重报均保留版本与证据。
 
@@ -46,6 +47,14 @@ docker compose exec -T backend python -m scripts.seed_demo --with-billing
 
 更正原因分抄录错误、倍率异常、吞吐吨日复盘。倍率异常只改电量，吞吐复盘只改吨日。驳回记录留档，可以补充证据重提。同一条原表最多有一张待复核或已批准的更正单。
 
+## 归属转移演示
+
+1. 在「抄表更正单」的归属转移复核队列可见十一月工单 `HF-1130`：`MTR-HAI-02` 的 11 月 30 日读数 980 kWh / 210 吨日实为 `MTR-HAI-03` 东港周转库总表，等待复核。
+2. 复核员批准转移。该读数从备用表名下迁出、计入东港总表，原始归属在转移单中留档；两块电表十一月的差异单同时重开，十一月月报草稿重算，电量与吨日各只计一次。
+3. 在「原始抄表与生效值」切换到 `MTR-HAI-03` 可看到迁入的读数；`MTR-HAI-02` 的十一月差异单重开后实际电量归零。
+
+归属转移在抄表更正页面发起，需选择正确的电表与核算月并附证据，由另一人复核。转入位置已有读数时转移单自动退回；同一记录的转移与普通更正并发时只生效一项；转出或转入的任一核算月已签发月报时整笔拒绝；批准超时后重试返回首次结果，不重复转移。
+
 首个站点保存预算后，签发须覆盖该月报差异单中的全部站点。未配置任何站点的月报沿用原发布流程。已签发的预算不可编辑。估算成本按 `电量 × 电价` 四舍五入至分，成本偏差以实际成本减预算成本计算。
 
 ## 一月供应商账单演示
@@ -61,7 +70,7 @@ docker compose exec -T backend python -m scripts.seed_demo --with-billing
 
 ## 技术结构
 
-五服务为 `frontend`、`backend`、`worker`、`db`、`redis`。后端使用 FastAPI + PyMySQL，数据库使用 MySQL 8.0，前端为原生 HTML/CSS/JavaScript。JWT、审计日志、请求限流分别在 `backend/src/security.py`、`backend/src/services/audit.py` 和 `backend/src/middlewares/__init__.py` 中实现。共享枚举状态在后端路由和前端 `statusTag` 中各自定义。更正原因和决定状态见 `backend/src/closing_schemas.py`、`backend/src/db.py` 与 `frontend/closing.js`。`services/corrections.py` 和 `services/budgets.py` 承载更正与结算规则，新增业务与签发使用同一核算周期事务锁。账单决定在 `backend/src/billing_schemas.py` 和 `frontend/billing.js` 定义，核验差异枚举见 `backend/src/services/bill_math.py` 与 `frontend/billing.js`。为隔离验收环境可用 `COLDSTORE_DB_VOLUME`、`COLDSTORE_REDIS_VOLUME`、`COLDSTORE_ARTIFACT_VOLUME` 指定卷名。
+五服务为 `frontend`、`backend`、`worker`、`db`、`redis`。后端使用 FastAPI + PyMySQL，数据库使用 MySQL 8.0，前端为原生 HTML/CSS/JavaScript。JWT、审计日志、请求限流分别在 `backend/src/security.py`、`backend/src/services/audit.py` 和 `backend/src/middlewares/__init__.py` 中实现。共享枚举状态在后端路由和前端 `statusTag` 中各自定义。更正原因和决定状态见 `backend/src/closing_schemas.py`、`backend/src/db.py` 与 `frontend/closing.js`。`services/corrections.py` 和 `services/budgets.py` 承载更正与结算规则，归属转移规则在 `services/transfers.py`，转移与更正共用同一记录的互斥约束，新增业务与签发使用同一核算周期事务锁，跨月操作按周期排序加锁。账单决定在 `backend/src/billing_schemas.py` 和 `frontend/billing.js` 定义，核验差异枚举见 `backend/src/services/bill_math.py` 与 `frontend/billing.js`。为隔离验收环境可用 `COLDSTORE_DB_VOLUME`、`COLDSTORE_REDIS_VOLUME`、`COLDSTORE_ARTIFACT_VOLUME` 指定卷名。
 
 ## 算法口径
 

@@ -35,6 +35,9 @@ def create_correction(cur, payload, reading, user_id):
     cur.execute("SELECT id FROM reading_corrections WHERE active_reading_id=%s", (reading['id'],))
     if cur.fetchone():
         raise HTTPException(409, detail="该抄表记录已有待复核或已批准的更正")
+    cur.execute("SELECT id FROM reading_transfers WHERE active_reading_id=%s", (reading['id'],))
+    if cur.fetchone():
+        raise HTTPException(409, detail="该抄表记录已有待复核或已批准的归属转移，更正与转移仅生效一项")
     value_changed = payload.corrected_value != reading['value']
     tons_changed = payload.corrected_ton_days != reading['throughput_ton_day']
     if not value_changed and not tons_changed:

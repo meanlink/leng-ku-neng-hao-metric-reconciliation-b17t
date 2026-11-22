@@ -80,6 +80,24 @@ SCHEMA = [
         (status IN ('approved','rejected') AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_note IS NOT NULL)
       )
     ) ENGINE=InnoDB""",
+    """CREATE TABLE IF NOT EXISTS reading_transfers (
+      id INT PRIMARY KEY AUTO_INCREMENT, reading_id INT NOT NULL,
+      from_source_id INT NOT NULL, from_period CHAR(7) NOT NULL,
+      to_source_id INT NOT NULL, to_period CHAR(7) NOT NULL,
+      evidence VARCHAR(500) NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      submitted_by INT NOT NULL, submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      decided_by INT NULL, decided_at DATETIME NULL, decision_note VARCHAR(500),
+      active_reading_id INT GENERATED ALWAYS AS (CASE WHEN status IN ('pending','approved') THEN reading_id END) STORED,
+      UNIQUE KEY uq_active_transfer(active_reading_id), KEY ix_transfer_reading(reading_id),
+      FOREIGN KEY(reading_id) REFERENCES meter_readings(id),
+      FOREIGN KEY(from_source_id) REFERENCES meter_sources(id),
+      FOREIGN KEY(to_source_id) REFERENCES meter_sources(id),
+      FOREIGN KEY(submitted_by) REFERENCES users(id), FOREIGN KEY(decided_by) REFERENCES users(id),
+      CONSTRAINT ck_transfer_state CHECK (
+        (status='pending' AND decided_by IS NULL AND decided_at IS NULL AND decision_note IS NULL) OR
+        (status IN ('approved','rejected') AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_note IS NOT NULL)
+      )
+    ) ENGINE=InnoDB""",
     """CREATE TABLE IF NOT EXISTS monthly_site_budgets (
       report_id INT NOT NULL, site VARCHAR(120) NOT NULL,
       budget_kwh DECIMAL(14,3) NOT NULL, rate_cny_per_kwh DECIMAL(8,4) NOT NULL,
